@@ -1,0 +1,74 @@
+
+div.yakcdButton {
+    position: absolute;
+    cursor: pointer;
+    height: 32px;
+    width: 32px;
+    overflow: hidden;
+    display: inline-block;
+    z-index: 1;
+}
+
+div.yakcdButton div.cloudDown {
+    width: 32px;
+    height: 12px;
+    margin-top: 14px;
+    -webkit-border-radius: 10px;
+    -moz-border-radius: 10px;
+    border-radius: 10px;
+    background: -webkit-gradient(linear, center top, center bottom, from(#5f5f5f), to(#323232));
+    background: -moz-linear-gradient(top center, #5f5f5f 0%, #323232 100%);
+    background: linear-gradient(top center, #5f5f5f 0%, #323232 100%);
+    box-shadow: 0px 1px 1px 0px rgba(0,0,0,0.4);
+    z-index: 1;
+}
+
+div.yakcdButton div.cloudDown:before {
+    content: '';
+    position: absolute;
+    right: 5px;
+    top: 7px;
+    width: 15px;
+    height: 15px;
+    -webkit-border-radius: 20px;
+    -moz-border-radius: 20px;
+    border-radius: 20px;
+    background: #5f5f5f;
+    z-index: -1;
+}
+
+div.yakcdButton div.cloudDown:after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 9px;
+    width: 10px;
+    height: 10px;
+    -webkit-border-radius: 20px;
+    -moz-border-radius: 20px;
+    border-radius: 20px;
+    background: #5f5f5f;
+    z-index: -1;
+}
+
+div.yakcdButton div.cloudDownArrow {
+    position: absolute;
+    left: 11px;
+    bottom: 3px;
+    height: 0px;
+    width: 0px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #de7e05 transparent transparent transparent;
+}
+
+div.yakcdButton div.cloudDownArrow:after {
+    content: '';
+    position: absolute;
+    right: -2px;
+    bottom: 4px;
+    width: 4px;
+    height: 5px;
+    background-color: #de7e05;
+}
+
