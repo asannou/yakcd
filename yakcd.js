@@ -7,8 +7,8 @@
  */
 
 $.when(
-  $.getScript("//stuk.github.io/jszip/dist/jszip.js"),
-  $.getScript("//stuk.github.io/jszip/vendor/FileSaver.js")
+  $.getScript("//asannou.github.io/yakcd/jszip/dist/jszip.min.js"),
+  $.getScript("//asannou.github.io/yakcd/FileSaver.js/FileSaver.min.js")
 ).
 done(function() {
 
