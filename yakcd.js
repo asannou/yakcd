@@ -12,8 +12,12 @@ $.when(
 ).
 done(function() {
 
+var iframeWindow = $("#KindleLibraryIFrame").get(0).contentWindow;
+var iframeDocument = $(iframeWindow.document);
+
 var Indicator = function() {
   var originalTitle = document.title;
+  var dialog = iframeWindow.KindleLibraryProgressDialog;
   var value = 0;
   var maximum = 1;
   return {
@@ -26,6 +30,10 @@ var Indicator = function() {
     display: function() {
       var percent = Math.round(value * 100 / maximum);
       document.title = "[" + percent + "%] " + originalTitle;
+      if (!value) {
+        this.openDialog();
+      }
+      dialog.updateValue(percent);
     },
     incrementAndDisplay: function() {
       this.increment();
@@ -34,30 +42,17 @@ var Indicator = function() {
     clear: function() {
       value = 0;
       document.title = originalTitle;
-    }
-  };
-}();
-
-var Blocker = function() {
-  var div = $('<div/>').
-  css({
-    top: 0,
-    right: 0,
-    width: "100%",
-    height: "100%",
-    position: "fixed",
-    zIndex: 1000,
-    background: "#000",
-    opacity: 0.5
-  }).
-  hide().
-  appendTo("body");
-  return {
-    block: function() {
-      div.animate({ opacity: "show" });
+      this.closeDialog();
     },
-    unblock: function() {
-      div.animate({ opacity: "hide" });
+    openDialog: function() {
+      dialog.open(function() {
+        location.reload();
+      });
+      iframeDocument.find("#kindleLibrary_dialog_progressMessage").hide();
+    },
+    closeDialog: function() {
+      iframeDocument.find("#kindleLibrary_dialog_progressMessage").show();
+      dialog.close();
     }
   };
 }();
@@ -168,17 +163,15 @@ pipe(function(url) {
 
 };
 
-var iframe = $("#KindleLibraryIFrame").contents();
-
 $("<link/>").
 attr({
   rel: "stylesheet",
   type: "text/css",
   href: "//asannou.github.io/yakcd/yakcd.css"
 }).
-appendTo(iframe.find("head"));
+appendTo(iframeDocument.find("head"));
 
-iframe.
+iframeDocument.
 find(".book_container").
 each(function(){
   var bookImage = $(this).find(".book_image");
@@ -191,11 +184,8 @@ each(function(){
   css("position", "absolute").
   offset(offset).
   click(function() {
-    Blocker.block();
     var asin = $(this).parent().attr("id");
-    Yakcd(asin).done(function() {
-      Blocker.unblock();
-    });
+    Yakcd(asin);
   }).
   append($("<div/>").attr("class", "cloudDown")).
   append($("<div/>").attr("class", "cloudDownArrow"));
