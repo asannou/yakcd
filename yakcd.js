@@ -95,6 +95,8 @@ var Ajax = function() {
 
 var Yakcd = function(asin) {
 
+const CONCURRENCY = 5;
+
 return $.Deferred().
 resolve().
 pipe(function(content) {
@@ -126,35 +128,49 @@ pipe(function(book) {
       }
     });
     Indicator.setMaximum(id.length);
-    return Ajax.get(
-      "/service/web/reader/getFileUrl", {
-        asin: asin,
-        contentVersion: book["contentVersion"],
-        formatVersion: book["formatVersion"],
-        kindleSessionId: book["kindleSessionId"],
-        resourceIds: id.join(",")
-      }
-    );
+    var index = [];
+    for (var i = 0; i < id.length / CONCURRENCY; i++) {
+      index.push(i);
+    }
+    var ids = $.map(index, function(i) {
+      return [id.slice(i * CONCURRENCY, (i + 1) * CONCURRENCY)];
+    });
+    return $.when.apply($, $.map(ids, function(id) {
+      return Ajax.get(
+        "/service/web/reader/getFileUrl", {
+          asin: asin,
+          contentVersion: book["contentVersion"],
+          formatVersion: book["formatVersion"],
+          kindleSessionId: book["kindleSessionId"],
+          resourceIds: id.join(",")
+        }
+      );
+    }));
   });
 }).
-pipe(function(url) {
+pipe(function() {
   var zip = new JSZip();
-  return $.when.apply($, $.map(url["resourceUrls"], function(u, i) {
-    return $.ajax({
-      url: u["signedUrl"],
-      dataType: "jsonp",
-      jsonpCallback: "loadResource" + u["id"],
-      timeout: 0
-    }).
-    success(function(resource) {
-      var id = ("000" + resource["metadata"]["id"]).substr(-4);
-      var type = resource["metadata"]["type"].split("/")[1];
-      var data = resource["data"].split(",")[1];
-      zip.file("resource" + id + "." + type, data, { base64: true });
-      Indicator.incrementAndDisplay();
+  var d = $.Deferred().resolve();
+  $.each(arguments, function(i, url) {
+    d = d.pipe(function() {
+      return $.when.apply($, $.map(url[0]["resourceUrls"], function(u, i) {
+        return $.ajax({
+          url: u["signedUrl"],
+          dataType: "jsonp",
+          jsonpCallback: "loadResource" + u["id"],
+          timeout: 0
+        }).
+        success(function(resource) {
+          var id = ("000" + resource["metadata"]["id"]).substr(-4);
+          var type = resource["metadata"]["type"].split("/")[1];
+          var data = resource["data"].split(",")[1];
+          zip.file("resource" + id + "." + type, data, { base64: true });
+          Indicator.incrementAndDisplay();
+        });
+      }))
     });
-  })).
-  done(function() {
+  });
+  d.done(function() {
     var content = zip.generate({ type: "blob" });
     saveAs(content, asin + ".zip");
     Indicator.clear();
