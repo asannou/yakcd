@@ -97,8 +97,7 @@ var Yakcd = function(asin) {
 
 const CONCURRENCY = 5;
 
-return $.Deferred().
-resolve().
+return $.Deferred().resolve().
 pipe(function(content) {
   Indicator.display();
   return Ajax.get(
@@ -109,33 +108,37 @@ pipe(function(content) {
   );
 }).
 pipe(function(book) {
-  return $.Deferred().
-  resolve().
-  pipe(function() {
-    return $.ajax({
-      url: book["manifestUrl"],
-      dataType: "jsonp",
-      jsonpCallback: "loadManifest"
-    });
+  return $.ajax({
+    url: book["manifestUrl"],
+    dataType: "jsonp",
+    jsonpCallback: "loadManifest"
   }).
   pipe(function(manifest) {
-    var id = $.map(manifest["resourceManifest"], function(m, i) {
-      var type = m["type"].split("/")[0];
-      if (type == "image") {
-        return i;
-      } else {
-        return null;
-      }
-    });
-    Indicator.setMaximum(id.length);
-    var index = [];
-    for (var i = 0; i < id.length / CONCURRENCY; i++) {
-      index.push(i);
+    return $.Deferred().resolve(book, manifest);
+  });
+}).
+pipe(function(book, manifest) {
+  var id = $.map(manifest["resourceManifest"], function(m, i) {
+    var type = m["type"].split("/")[0];
+    if (type == "image") {
+      return i;
+    } else {
+      return null;
     }
-    var ids = $.map(index, function(i) {
-      return [id.slice(i * CONCURRENCY, (i + 1) * CONCURRENCY)];
-    });
-    return $.when.apply($, $.map(ids, function(id) {
+  });
+  Indicator.setMaximum(id.length);
+  var index = [];
+  for (var i = 0; i < id.length / CONCURRENCY; i++) {
+    index.push(i);
+  }
+  var ids = $.map(index, function(i) {
+    return [id.slice(i * CONCURRENCY, (i + 1) * CONCURRENCY)];
+  });
+  var zip = new JSZip();
+  var d = $.Deferred().resolve();
+  $.each(ids, function(i, id) {
+    d = d.
+    pipe(function() {
       return Ajax.get(
         "/service/web/reader/getFileUrl", {
           asin: asin,
@@ -145,15 +148,9 @@ pipe(function(book) {
           resourceIds: id.join(",")
         }
       );
-    }));
-  });
-}).
-pipe(function() {
-  var zip = new JSZip();
-  var d = $.Deferred().resolve();
-  $.each(arguments, function(i, url) {
-    d = d.pipe(function() {
-      return $.when.apply($, $.map(url[0]["resourceUrls"], function(u, i) {
+    }).
+    pipe(function(url) {
+      return $.when.apply($, $.map(url["resourceUrls"], function(u, i) {
         return $.ajax({
           url: u["signedUrl"],
           dataType: "jsonp",
@@ -167,14 +164,17 @@ pipe(function() {
           zip.file("resource" + id + "." + type, data, { base64: true });
           Indicator.incrementAndDisplay();
         });
-      }))
+      }));
     });
   });
-  d.done(function() {
+  return d.pipe(function() {
     var content = zip.generate({ type: "blob" });
-    saveAs(content, asin + ".zip");
-    Indicator.clear();
+    return $.Deferred().resolve(content);
   });
+}).
+done(function(content) {
+  saveAs(content, asin + ".zip");
+  Indicator.clear();
 });
 
 };
