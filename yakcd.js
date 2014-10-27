@@ -95,7 +95,7 @@ var Ajax = function() {
 
 var Yakcd = function(asin) {
 
-const CONCURRENCY = 5;
+const CONCURRENCY = 6;
 
 return $.Deferred().resolve().
 pipe(function(content) {
@@ -127,13 +127,10 @@ pipe(function(book, manifest) {
     }
   });
   Indicator.setMaximum(id.length);
-  var index = [];
+  var ids = [];
   for (var i = 0; i < id.length / CONCURRENCY; i++) {
-    index.push(i);
+    ids.push(id.slice(i * CONCURRENCY, (i + 1) * CONCURRENCY));
   }
-  var ids = $.map(index, function(i) {
-    return [id.slice(i * CONCURRENCY, (i + 1) * CONCURRENCY)];
-  });
   var zip = new JSZip();
   var d = $.Deferred().resolve();
   $.each(ids, function(i, id) {
