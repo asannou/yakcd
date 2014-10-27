@@ -111,7 +111,10 @@ pipe(function(book) {
   return $.ajax({
     url: book["manifestUrl"],
     dataType: "jsonp",
-    jsonpCallback: "loadManifest"
+    jsonp: false,
+    jsonpCallback: "loadManifest",
+    cache: true,
+    timeout: 0
   }).
   pipe(function(manifest) {
     return $.Deferred().resolve(book, manifest);
@@ -151,7 +154,9 @@ pipe(function(book, manifest) {
         return $.ajax({
           url: u["signedUrl"],
           dataType: "jsonp",
+          jsonp: false,
           jsonpCallback: "loadResource" + u["id"],
+          cache: true,
           timeout: 0
         }).
         success(function(resource) {
