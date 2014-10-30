@@ -57,55 +57,20 @@ var Indicator = function() {
   };
 }();
 
-var Ajax = function() {
-  var deviceSessionToken;
-  var getDeviceToken = function() {
-    if (deviceSessionToken) {
-      return $.Deferred().resolve(deviceSessionToken);
-    }
-    return KindleModuleManager.
-    getModule(KindleModuleManager.DB_CLIENT).
-    pipe(function(module){
-      return module.getAppDb().getDeviceToken();
-    }).
-    done(function(token){
-      deviceSessionToken = token["deviceSessionToken"];
-      return $.Deferred().resolve(deviceSessionToken);
-    });
-  };
-  return {
-    get: function() {
-      var url = arguments[0];
-      var param = "";
-      if (arguments[1]) {
-        param = "?" + $.param(arguments[1]);
-      }
-      return getDeviceToken().
-      pipe(function(sessionToken) {
-        return $.ajax({
-          url: url + param,
-          headers: {
-            "X-ADP-Session-Token": sessionToken
-          }
-        });
-      });
-    }
-  };
-}();
-
 var Yakcd = function(asin) {
 
 const CONCURRENCY = 6;
 
+var serviceClient = KindleModuleManager.
+getModuleSync(KindleModuleManager.SERVICE_CLIENT);
+
 return $.Deferred().resolve().
 pipe(function(content) {
   Indicator.display();
-  return Ajax.get(
-    "/service/web/reader/startReading", {
-      asin: asin,
-      clientVersion: KindleVersion.getVersionNumber()
-    }
-  );
+  return serviceClient.startReading({
+    asin: asin,
+    clientVersion: KindleVersion.getVersionNumber()
+  });
 }).
 pipe(function(book) {
   return $.ajax({
@@ -139,15 +104,13 @@ pipe(function(book, manifest) {
   $.each(ids, function(i, id) {
     d = d.
     pipe(function() {
-      return Ajax.get(
-        "/service/web/reader/getFileUrl", {
-          asin: asin,
-          contentVersion: book["contentVersion"],
-          formatVersion: book["formatVersion"],
-          kindleSessionId: book["kindleSessionId"],
-          resourceIds: id.join(",")
-        }
-      );
+      return serviceClient.getFileUrl({
+        asin: asin,
+        contentVersion: book["contentVersion"],
+        formatVersion: book["formatVersion"],
+        kindleSessionId: book["kindleSessionId"],
+        resourceIds: id
+      });
     }).
     pipe(function(url) {
       return $.when.apply($, $.map(url["resourceUrls"], function(u, i) {
