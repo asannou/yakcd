@@ -86,7 +86,7 @@ pipe(function(book) {
   });
 }).
 pipe(function(book, manifest) {
-  var id = $.map(manifest["resourceManifest"], function(m, i) {
+  var ids = $.map(manifest["resourceManifest"], function(m, i) {
     var type = m["type"].split("/")[0];
     if (type == "image") {
       return i;
@@ -94,14 +94,14 @@ pipe(function(book, manifest) {
       return null;
     }
   });
-  Indicator.setMaximum(id.length);
-  var ids = [];
-  for (var i = 0; i < id.length / CONCURRENCY; i++) {
-    ids.push(id.slice(i * CONCURRENCY, (i + 1) * CONCURRENCY));
+  Indicator.setMaximum(ids.length);
+  var slicedIds = [];
+  for (var i = 0; i < ids.length / CONCURRENCY; i++) {
+    slicedIds.push(ids.slice(i * CONCURRENCY, (i + 1) * CONCURRENCY));
   }
   var zip = new JSZip();
   var d = $.Deferred().resolve();
-  $.each(ids, function(i, id) {
+  $.each(slicedIds, function(i, ids) {
     d = d.
     pipe(function() {
       return serviceClient.getFileUrl({
@@ -109,7 +109,7 @@ pipe(function(book, manifest) {
         contentVersion: book["contentVersion"],
         formatVersion: book["formatVersion"],
         kindleSessionId: book["kindleSessionId"],
-        resourceIds: id
+        resourceIds: ids
       });
     }).
     pipe(function(url) {
