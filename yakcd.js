@@ -93,6 +93,20 @@ var Zipper = (function() {
   };
 })();
 
+var Retriable = function(dd) {
+  var d = $.Deferred();
+  (function n() {
+    dd().pipe(d.resolve, function() {
+      if (window.confirm("retry? " + this.url)) {
+        n();
+      } else {
+        d.reject();
+      }
+    });
+  })();
+  return d;
+};
+
 var Yakcd = function(asin) {
 
 const CONCURRENCY = 6;
@@ -103,19 +117,23 @@ getModuleSync(KindleModuleManager.SERVICE_CLIENT);
 return $.Deferred().resolve().
 pipe(function(content) {
   Indicator.display();
-  return serviceClient.startReading({
-    asin: asin,
-    clientVersion: KindleVersion.getVersionNumber()
+  return Retriable(function() {
+    return serviceClient.startReading({
+      asin: asin,
+      clientVersion: KindleVersion.getVersionNumber()
+    });
   });
 }).
 pipe(function(book) {
-  return $.ajax({
-    url: book["manifestUrl"],
-    dataType: "jsonp",
-    jsonp: false,
-    jsonpCallback: "loadManifest",
-    cache: true,
-    timeout: 30000
+  return Retriable(function() {
+    return $.ajax({
+      url: book["manifestUrl"],
+      dataType: "jsonp",
+      jsonp: false,
+      jsonpCallback: "loadManifest",
+      cache: true,
+      timeout: 30000
+    });
   }).
   pipe(function(manifest) {
     return $.Deferred().resolve(book, manifest);
@@ -139,23 +157,27 @@ pipe(function(book, manifest) {
   $.each(slicedIds, function(i, ids) {
     d = d.
     pipe(function() {
-      return serviceClient.getFileUrl({
-        asin: asin,
-        contentVersion: book["contentVersion"],
-        formatVersion: book["formatVersion"],
-        kindleSessionId: book["kindleSessionId"],
-        resourceIds: ids
+      return Retriable(function() {
+        return serviceClient.getFileUrl({
+          asin: asin,
+          contentVersion: book["contentVersion"],
+          formatVersion: book["formatVersion"],
+          kindleSessionId: book["kindleSessionId"],
+          resourceIds: ids
+        });
       });
     }).
     pipe(function(url) {
       return $.when.apply($, $.map(url["resourceUrls"], function(u, i) {
-        return $.ajax({
-          url: u["signedUrl"],
-          dataType: "jsonp",
-          jsonp: false,
-          jsonpCallback: "loadResource" + u["id"],
-          cache: true,
-          timeout: 30000
+        return Retriable(function() {
+          return $.ajax({
+            url: u["signedUrl"],
+            dataType: "jsonp",
+            jsonp: false,
+            jsonpCallback: "loadResource" + u["id"],
+            cache: true,
+            timeout: 30000
+          });
         }).
         pipe(function(resource) {
           var id = ("000" + resource["metadata"]["id"]).substr(-4);
