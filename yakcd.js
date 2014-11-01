@@ -7,7 +7,6 @@
  */
 
 $.when(
-  $.getScript("//asannou.github.io/yakcd/jszip/dist/jszip.min.js"),
   $.getScript("//asannou.github.io/yakcd/jszip/vendor/FileSaver.js")
 ).
 done(function() {
@@ -57,6 +56,43 @@ var Indicator = function() {
   };
 }();
 
+var Zipper = (function() {
+  var javascript = (function() {
+    importScripts("https://asannou.github.io/yakcd/jszip/dist/jszip.min.js");
+    var zip = new JSZip();
+    self.addEventListener("message", function(e) {
+      var id = e.data[0];
+      var name = e.data[1];
+      var r = zip[name].apply(zip, e.data[2]);
+      self.postMessage([id, r instanceof JSZip ? null : r]);
+    });
+  }).
+  toString().
+  match(/{([\d\D]*)}/)[1];
+  var blob = new Blob([ javascript ], { type: "text/javascript" });
+  var blobURL = window.URL.createObjectURL(blob);
+  var worker = new Worker(blobURL);
+  var post = function(name) {
+    return function() {
+      var d = $.Deferred();
+      var id = Math.random().toString(36).substr(2);
+      var listener = function(e) {
+        if (e.data[0] == id) {
+          worker.removeEventListener("message", listener);
+          return d.resolve(e.data[1]);
+        }
+      };
+      worker.addEventListener("message", listener);
+      worker.postMessage([id, name, $.makeArray(arguments)]);
+      return d;
+    };
+  };
+  return {
+    file: post("file"),
+    generate: post("generate")
+  };
+})();
+
 var Yakcd = function(asin) {
 
 const CONCURRENCY = 6;
@@ -79,7 +115,7 @@ pipe(function(book) {
     jsonp: false,
     jsonpCallback: "loadManifest",
     cache: true,
-    timeout: 0
+    timeout: 30000
   }).
   pipe(function(manifest) {
     return $.Deferred().resolve(book, manifest);
@@ -99,7 +135,6 @@ pipe(function(book, manifest) {
   for (var i = 0; i < ids.length / CONCURRENCY; i++) {
     slicedIds.push(ids.slice(i * CONCURRENCY, (i + 1) * CONCURRENCY));
   }
-  var zip = new JSZip();
   var d = $.Deferred().resolve();
   $.each(slicedIds, function(i, ids) {
     d = d.
@@ -120,21 +155,26 @@ pipe(function(book, manifest) {
           jsonp: false,
           jsonpCallback: "loadResource" + u["id"],
           cache: true,
-          timeout: 0
+          timeout: 30000
         }).
-        success(function(resource) {
+        pipe(function(resource) {
           var id = ("000" + resource["metadata"]["id"]).substr(-4);
           var type = resource["metadata"]["type"].split("/")[1];
           var data = resource["data"].split(",")[1];
-          zip.file("resource" + id + "." + type, data, { base64: true });
-          Indicator.incrementAndDisplay();
+          return Zipper.file(
+            "resource" + id + "." + type,
+            data,
+            { base64: true }
+          ).pipe(function() {
+            Indicator.incrementAndDisplay();
+            return $.Deferred().resolve();
+          });
         });
       }));
     });
   });
   return d.pipe(function() {
-    var content = zip.generate({ type: "blob" });
-    return $.Deferred().resolve(content);
+    return Zipper.generate({ type: "blob" });
   });
 }).
 done(function(content) {
