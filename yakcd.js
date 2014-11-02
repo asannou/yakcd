@@ -107,9 +107,10 @@ var Retriable = function(dd) {
   return d;
 };
 
-var Yakcd = function(asin) {
+var query = $("<a>", { href: $("script").last().attr("src") })[0].search;
+var concurrency = query ? query.substr(1) : 6;
 
-const CONCURRENCY = 6;
+var Yakcd = function(asin) {
 
 var serviceClient = KindleModuleManager.
 getModuleSync(KindleModuleManager.SERVICE_CLIENT);
@@ -150,8 +151,8 @@ pipe(function(book, manifest) {
   });
   Indicator.setMaximum(ids.length);
   var slicedIds = [];
-  for (var i = 0; i < ids.length / CONCURRENCY; i++) {
-    slicedIds.push(ids.slice(i * CONCURRENCY, (i + 1) * CONCURRENCY));
+  for (var i = 0; i < ids.length / concurrency; i++) {
+    slicedIds.push(ids.slice(i * concurrency, (i + 1) * concurrency));
   }
   var d = $.Deferred().resolve();
   $.each(slicedIds, function(i, ids) {
