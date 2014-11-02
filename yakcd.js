@@ -107,8 +107,10 @@ var Retriable = function(dd) {
   return d;
 };
 
-var query = $("<a>", { href: $("script").last().attr("src") })[0].search;
-var concurrency = query ? query.substr(1) : 6;
+var concurrency = (function() {
+  var query = $("<a>", { href: $("script").last().attr("src") })[0].search;
+  return query ? query.substr(1) : 6;
+})();
 
 var Yakcd = function(asin) {
 
