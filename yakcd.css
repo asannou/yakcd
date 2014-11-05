@@ -72,3 +72,10 @@ div.yakcdButton div.cloudDownArrow:after {
     background-color: #de7e05;
 }
 
+div.yakcdButton div.cloudDownArrow.offline {
+    border-color: #68b600 transparent transparent transparent;
+}
+
+div.yakcdButton div.cloudDownArrow.offline:after {
+    background-color: #68b600;
+}

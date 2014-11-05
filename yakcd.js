@@ -118,7 +118,7 @@ var serviceClient = KindleModuleManager.
 getModuleSync(KindleModuleManager.SERVICE_CLIENT);
 
 return $.Deferred().resolve().
-pipe(function(content) {
+pipe(function() {
   Indicator.display();
   return Retriable(function() {
     return serviceClient.startReading({
@@ -209,6 +209,60 @@ done(function(content) {
 
 };
 
+var YakcdOffline = function(asin) {
+
+var bookInfoDB = KindleModuleManager.
+getModuleSync(KindleModuleManager.DB_CLIENT).
+getBookDb().
+BookInfoDB(asin);
+
+return $.Deferred().resolve().
+pipe(function() {
+  Indicator.display();
+  return bookInfoDB.getResourceIds();
+}).
+pipe(function(ids) {
+  return bookInfoDB.getResources(ids);
+}).
+pipe(function(resources) {
+  resources = $.map(resources, function(resource) {
+    var type = resource ? resource["metadata"]["type"].split("/") : [];
+    if (type[0] == "image") {
+      var id = ("000" + resource["metadata"]["id"]).substr(-4);
+      resource["file"] = "resource" + id + "." + type[1];
+      resource["data"] = resource["data"].split(",")[1];
+      return resource;
+    } else {
+      return null;
+    }
+  });
+  Indicator.setMaximum(resources.length);
+  var d = $.Deferred().resolve();
+  $.each(resources, function(i, resource) {
+    d = d.
+    pipe(function() {
+      return Zipper.file(
+        resource["file"],
+        resource["data"],
+        { base64: true }
+      ).pipe(function() {
+        Indicator.incrementAndDisplay();
+        return $.Deferred().resolve();
+      });
+    });
+  });
+  return d;
+}).
+pipe(function() {
+  return Zipper.generate({ type: "blob" });
+}).
+done(function(content) {
+  saveAs(content, asin + ".zip");
+  Indicator.clear();
+});
+
+};
+
 $("<link/>").
 attr({
   rel: "stylesheet",
@@ -220,21 +274,30 @@ appendTo(iframeDocument.find("head"));
 iframeDocument.
 find(".book_container").
 each(function(){
+  var asin = $(this).attr("id");
   var bookImage = $(this).find(".book_image");
   offset = bookImage.offset();
   offset.left += bookImage.width() - 16;
   offset.top -= 16;
-  $("<div/>").
+  var button = $("<div/>").
   appendTo($(this)).
   attr("class", "yakcdButton").
   css("position", "absolute").
-  offset(offset).
-  click(function() {
-    var asin = $(this).parent().attr("id");
-    Yakcd(asin);
-  }).
-  append($("<div/>").attr("class", "cloudDown")).
-  append($("<div/>").attr("class", "cloudDownArrow"));
+  offset(offset);
+  if (
+    $(this).hasClass("book_is_cached") ||
+    $(this).hasClass("book_is_pinned")
+  ) {
+    button.
+    append($("<div/>").attr("class", "cloudDown")).
+    append($("<div/>").attr("class", "cloudDownArrow offline")).
+    click(function () { YakcdOffline(asin); });
+  } else {
+    button.
+    append($("<div/>").attr("class", "cloudDown")).
+    append($("<div/>").attr("class", "cloudDownArrow")).
+    click(function () { Yakcd(asin); });
+  }
 });
 
 });
