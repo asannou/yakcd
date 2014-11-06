@@ -7,9 +7,9 @@
  */
 
 $.when(
-  $.getScript("//asannou.github.io/yakcd/jszip/vendor/FileSaver.js")
-).
-done(function() {
+  $.getScript("https://asannou.github.io/yakcd/jszip/vendor/FileSaver.js")
+)
+.done(function() {
 
 var iframeWindow = $("#KindleLibraryIFrame").get(0).contentWindow;
 var iframeDocument = $(iframeWindow.document);
@@ -19,6 +19,9 @@ var Indicator = function() {
   var dialog = iframeWindow.KindleLibraryProgressDialog;
   var value = 0;
   var maximum = 1;
+  var findProgressMessage = function() {
+    return iframeDocument.find("#kindleLibrary_dialog_progressMessage");
+  };
   return {
     setMaximum: function(m) {
       maximum = m;
@@ -47,10 +50,10 @@ var Indicator = function() {
       dialog.open(function() {
         location.reload();
       });
-      iframeDocument.find("#kindleLibrary_dialog_progressMessage").hide();
+      findProgressMessage().hide();
     },
     closeDialog: function() {
-      iframeDocument.find("#kindleLibrary_dialog_progressMessage").show();
+      findProgressMessage().show();
       dialog.close();
     }
   };
@@ -60,15 +63,15 @@ var Zipper = (function() {
   var javascript = (function() {
     importScripts("https://asannou.github.io/yakcd/jszip/dist/jszip.min.js");
     var zip = new JSZip();
-    self.addEventListener("message", function(e) {
+    this.addEventListener("message", function(e) {
       var id = e.data[0];
       var name = e.data[1];
       var r = zip[name].apply(zip, e.data[2]);
-      self.postMessage([id, r instanceof JSZip ? null : r]);
+      this.postMessage([id, r instanceof JSZip ? null : r]);
     });
-  }).
-  toString().
-  match(/{([\d\D]*)}/)[1];
+  })
+  .toString()
+  .match(/{([\d\D]*)}/)[1];
   var blob = new Blob([ javascript ], { type: "text/javascript" });
   var blobURL = window.URL.createObjectURL(blob);
   var worker = new Worker(blobURL);
@@ -114,11 +117,11 @@ var concurrency = (function() {
 
 var Yakcd = function(asin) {
 
-var serviceClient = KindleModuleManager.
-getModuleSync(KindleModuleManager.SERVICE_CLIENT);
+var serviceClient = KindleModuleManager
+.getModuleSync(KindleModuleManager.SERVICE_CLIENT);
 
-return $.Deferred().resolve().
-pipe(function() {
+return $.Deferred().resolve()
+.pipe(function() {
   Indicator.display();
   return Retriable(function() {
     return serviceClient.startReading({
@@ -126,25 +129,25 @@ pipe(function() {
       clientVersion: KindleVersion.getVersionNumber()
     });
   });
-}).
-pipe(function(book) {
+})
+.pipe(function(book) {
   return Retriable(function() {
     return $.ajax({
-      url: book["manifestUrl"],
+      url: book.manifestUrl,
       dataType: "jsonp",
       jsonp: false,
       jsonpCallback: "loadManifest",
       cache: true,
       timeout: 30000
     });
-  }).
-  pipe(function(manifest) {
+  })
+  .pipe(function(manifest) {
     return $.Deferred().resolve(book, manifest);
   });
-}).
-pipe(function(book, manifest) {
-  var ids = $.map(manifest["resourceManifest"], function(m, i) {
-    var type = m["type"].split("/")[0];
+})
+.pipe(function(book, manifest) {
+  var ids = $.map(manifest.resourceManifest, function(m, i) {
+    var type = m.type.split("/")[0];
     if (type == "image") {
       return i;
     } else {
@@ -158,34 +161,34 @@ pipe(function(book, manifest) {
   }
   var d = $.Deferred().resolve();
   $.each(slicedIds, function(i, ids) {
-    d = d.
-    pipe(function() {
+    d = d
+    .pipe(function() {
       return Retriable(function() {
         return serviceClient.getFileUrl({
           asin: asin,
-          contentVersion: book["contentVersion"],
-          formatVersion: book["formatVersion"],
-          kindleSessionId: book["kindleSessionId"],
+          contentVersion: book.contentVersion,
+          formatVersion: book.formatVersion,
+          kindleSessionId: book.kindleSessionId,
           resourceIds: ids
         });
       });
-    }).
-    pipe(function(url) {
-      return $.when.apply($, $.map(url["resourceUrls"], function(u, i) {
+    })
+    .pipe(function(url) {
+      return $.when.apply($, $.map(url.resourceUrls, function(u) {
         return Retriable(function() {
           return $.ajax({
-            url: u["signedUrl"],
+            url: u.signedUrl,
             dataType: "jsonp",
             jsonp: false,
-            jsonpCallback: "loadResource" + u["id"],
+            jsonpCallback: "loadResource" + u.id,
             cache: true,
             timeout: 30000
           });
-        }).
-        pipe(function(resource) {
-          var id = ("000" + resource["metadata"]["id"]).substr(-4);
-          var type = resource["metadata"]["type"].split("/")[1];
-          var data = resource["data"].split(",")[1];
+        })
+        .pipe(function(resource) {
+          var id = ("000" + resource.metadata.id).substr(-4);
+          var type = resource.metadata.type.split("/")[1];
+          var data = resource.data.split(",")[1];
           return Zipper.file(
             "resource" + id + "." + type,
             data,
@@ -201,8 +204,8 @@ pipe(function(book, manifest) {
   return d.pipe(function() {
     return Zipper.generate({ type: "blob" });
   });
-}).
-done(function(content) {
+})
+.done(function(content) {
   saveAs(content, asin + ".zip");
   Indicator.clear();
 });
@@ -211,39 +214,39 @@ done(function(content) {
 
 var YakcdOffline = function(asin) {
 
-var bookInfoDB = KindleModuleManager.
-getModuleSync(KindleModuleManager.DB_CLIENT).
-getBookDb().
-BookInfoDB(asin);
+var bookInfoDB = KindleModuleManager
+.getModuleSync(KindleModuleManager.DB_CLIENT)
+.getBookDb()
+.BookInfoDB(asin);
 
-return $.Deferred().resolve().
-pipe(function() {
+return $.Deferred().resolve()
+.pipe(function() {
   Indicator.display();
   return bookInfoDB.getResourceIds();
-}).
-pipe(function(ids) {
+})
+.pipe(function(ids) {
   return bookInfoDB.getResources(ids);
-}).
-pipe(function(resources) {
-  resources = $.map(resources, function(resource) {
-    var type = resource ? resource["metadata"]["type"].split("/") : [];
+})
+.pipe(function(resources) {
+  resources = $.map(resources, function(r) {
+    var type = r ? r.metadata.type.split("/") : [];
     if (type[0] == "image") {
-      var id = ("000" + resource["metadata"]["id"]).substr(-4);
-      resource["file"] = "resource" + id + "." + type[1];
-      resource["data"] = resource["data"].split(",")[1];
-      return resource;
+      var id = ("000" + r.metadata.id).substr(-4);
+      r.file = "resource" + id + "." + type[1];
+      r.data = r.data.split(",")[1];
+      return r;
     } else {
       return null;
     }
   });
   Indicator.setMaximum(resources.length);
   var d = $.Deferred().resolve();
-  $.each(resources, function(i, resource) {
-    d = d.
-    pipe(function() {
+  $.each(resources, function(i, r) {
+    d = d
+    .pipe(function() {
       return Zipper.file(
-        resource["file"],
-        resource["data"],
+        r.file,
+        r.data,
         { base64: true }
       ).pipe(function() {
         Indicator.incrementAndDisplay();
@@ -252,51 +255,51 @@ pipe(function(resources) {
     });
   });
   return d;
-}).
-pipe(function() {
+})
+.pipe(function() {
   return Zipper.generate({ type: "blob" });
-}).
-done(function(content) {
+})
+.done(function(content) {
   saveAs(content, asin + ".zip");
   Indicator.clear();
 });
 
 };
 
-$("<link/>").
-attr({
+$("<link/>")
+.attr({
   rel: "stylesheet",
   type: "text/css",
-  href: "//asannou.github.io/yakcd/yakcd.css"
-}).
-appendTo(iframeDocument.find("head"));
+  href: "https://asannou.github.io/yakcd/yakcd.css"
+})
+.appendTo(iframeDocument.find("head"));
 
-iframeDocument.
-find(".book_container").
-each(function(){
+iframeDocument
+.find(".book_container")
+.each(function() {
   var asin = $(this).attr("id");
   var bookImage = $(this).find(".book_image");
-  offset = bookImage.offset();
+  var offset = bookImage.offset();
   offset.left += bookImage.width() - 16;
   offset.top -= 16;
-  var button = $("<div/>").
-  appendTo($(this)).
-  attr("class", "yakcdButton").
-  css("position", "absolute").
-  offset(offset);
+  var button = $("<div/>")
+  .appendTo($(this))
+  .attr("class", "yakcdButton")
+  .css("position", "absolute")
+  .offset(offset);
   if (
     $(this).hasClass("book_is_cached") ||
     $(this).hasClass("book_is_pinned")
   ) {
-    button.
-    append($("<div/>").attr("class", "cloudDown")).
-    append($("<div/>").attr("class", "cloudDownArrow offline")).
-    click(function () { YakcdOffline(asin); });
+    button
+    .append($("<div/>").attr("class", "cloudDown"))
+    .append($("<div/>").attr("class", "cloudDownArrow offline"))
+    .click(function() { YakcdOffline(asin); });
   } else {
-    button.
-    append($("<div/>").attr("class", "cloudDown")).
-    append($("<div/>").attr("class", "cloudDownArrow")).
-    click(function () { Yakcd(asin); });
+    button
+    .append($("<div/>").attr("class", "cloudDown"))
+    .append($("<div/>").attr("class", "cloudDownArrow"))
+    .click(function() { Yakcd(asin); });
   }
 });
 
