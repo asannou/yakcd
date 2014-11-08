@@ -1,25 +1,29 @@
-/*
- * @title yakcd
- * @description Yet Another Kindle Cloud Downloader
- * @include https://read.amazon.com
- * @include https://read.amazon.co.jp
- * @license MIT License
- */
+// ==UserScript==
+// @name        yakcd
+// @namespace   asannou
+// @description Yet Another Kindle Cloud Downloader
+// @include     https://read.amazon.com/
+// @include     https://read.amazon.co.jp/
+// @grant       none
+// @run-at      document-end
+// @license     MIT License
+// ==/UserScript==
 
 $.when(
   $.getScript("https://asannou.github.io/yakcd/jszip/vendor/FileSaver.js")
 )
 .done(function() {
 
-var iframeWindow = $("#KindleLibraryIFrame").get(0).contentWindow;
-var iframeDocument = $(iframeWindow.document);
-
 var Indicator = function() {
   var originalTitle = document.title;
-  var dialog = iframeWindow.KindleLibraryProgressDialog;
   var value = 0;
   var maximum = 1;
+  var getDialog = function() {
+    var iframeWindow = $("#KindleLibraryIFrame").get(0).contentWindow;
+    return iframeWindow.KindleLibraryProgressDialog;
+  };
   var findProgressMessage = function() {
+    var iframeDocument = $("#KindleLibraryIFrame").contents();
     return iframeDocument.find("#kindleLibrary_dialog_progressMessage");
   };
   return {
@@ -35,7 +39,7 @@ var Indicator = function() {
       if (!value) {
         this.openDialog();
       }
-      dialog.updateValue(percent);
+      getDialog().updateValue(percent);
     },
     incrementAndDisplay: function() {
       this.increment();
@@ -47,14 +51,14 @@ var Indicator = function() {
       this.closeDialog();
     },
     openDialog: function() {
-      dialog.open(function() {
+      getDialog().open(function() {
         location.reload();
       });
       findProgressMessage().hide();
     },
     closeDialog: function() {
       findProgressMessage().show();
-      dialog.close();
+      getDialog().close();
     }
   };
 }();
@@ -266,30 +270,20 @@ return $.Deferred().resolve()
 
 };
 
-$("<link/>")
-.attr({
-  rel: "stylesheet",
-  type: "text/css",
-  href: "https://asannou.github.io/yakcd/yakcd.css"
-})
-.appendTo(iframeDocument.find("head"));
-
-iframeDocument
-.find(".book_container")
-.each(function() {
-  var asin = $(this).attr("id");
-  var bookImage = $(this).find(".book_image");
+var appendButtonTo = function(container) {
+  var asin = container.attr("id");
+  var bookImage = container.find(".book_image");
   var offset = bookImage.offset();
   offset.left += bookImage.width() - 16;
   offset.top -= 16;
   var button = $("<div/>")
-  .appendTo($(this))
+  .appendTo(container)
   .attr("class", "yakcdButton")
   .css("position", "absolute")
   .offset(offset);
   if (
-    $(this).hasClass("book_is_cached") ||
-    $(this).hasClass("book_is_pinned")
+    container.hasClass("book_is_cached") ||
+    container.hasClass("book_is_pinned")
   ) {
     button
     .append($("<div/>").attr("class", "cloudDown"))
@@ -301,7 +295,70 @@ iframeDocument
     .append($("<div/>").attr("class", "cloudDownArrow"))
     .click(function() { Yakcd(asin); });
   }
+};
+
+var appendCssTo = function(head) {
+  $("<link/>")
+  .attr({
+    rel: "stylesheet",
+    type: "text/css",
+    href: "https://asannou.github.io/yakcd/yakcd.css"
+  })
+  .appendTo(head);
+};
+
+if (!$("#KindleLibraryIFrame").length) {
+
+$.Deferred().resolve()
+.pipe(function() {
+  var d = $.Deferred();
+  new MutationObserver(function(mutations) {
+    this.disconnect();
+    var iframeWindow = mutations[0].addedNodes[0];
+    d.resolve($(iframeWindow));
+  })
+  .observe(
+    $("#KindleLibraryContainer")[0],
+    { childList: true }
+  );
+  return d;
+})
+.pipe(function(iframe) {
+  var d = $.Deferred();
+  iframe.on("load", function() {
+    var iframeDocument = $(iframe.contents());
+    d.resolve(iframeDocument);
+  });
+  return d;
+})
+.done(function(iframe) {
+  appendCssTo(iframe.find("head"));
+  new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      $.makeArray(mutation.addedNodes).forEach(function(div) {
+        appendButtonTo($(div));
+      });
+    });
+  })
+  .observe(
+    iframe.find("#titles_inner_wrapper")[0],
+    { childList: true }
+  );
 });
+
+} else {
+
+var iframeDocument = $("#KindleLibraryIFrame").contents();
+
+appendCssTo(iframeDocument.find("head"));
+
+iframeDocument
+.find(".book_container")
+.each(function() {
+  appendButtonTo($(this));
+});
+
+}
 
 });
 
