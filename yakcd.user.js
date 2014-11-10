@@ -9,7 +9,20 @@
 // @license     MIT License
 // ==/UserScript==
 
-(function() {
+(function(callback) {
+  if (typeof jQuery == "undefined") {
+    var script = document.createElement("script");
+    script.setAttribute("src", "https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js");
+    script.addEventListener("load", function() {
+      var script = document.createElement("script");
+      script.textContent = "(" + callback.toString() + ")(jQuery.noConflict(true));";
+      document.body.appendChild(script);
+    }, false);
+    document.body.appendChild(script);
+  } else {
+    callback($);
+  }
+})(function($) {
 
 var Indicator = (function() {
   var originalTitle = document.title;
@@ -293,14 +306,14 @@ var appendCssTo = function(head) {
 var appendButtonTo = function(container) {
   var asin = container.attr("id");
   var bookImage = container.find(".book_image");
-  var offset = bookImage.offset();
-  offset.left += bookImage.width() - 16;
-  offset.top -= 16;
   var button = $("<div/>")
   .appendTo(container)
   .attr("class", "yakcdButton")
-  .css("position", "absolute")
-  .offset(offset);
+  .css({
+    position: "absolute",
+    left: "70%",
+    top: "-6px"
+  });
   if (
     container.hasClass("book_is_cached") ||
     container.hasClass("book_is_pinned")
@@ -368,5 +381,5 @@ $.Deferred().resolve()
   });
 });
 
-})();
+});
 
