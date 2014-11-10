@@ -9,12 +9,9 @@
 // @license     MIT License
 // ==/UserScript==
 
-$.when(
-  $.getScript("https://asannou.github.io/yakcd/jszip/vendor/FileSaver.js")
-)
-.done(function() {
+(function() {
 
-var Indicator = function() {
+var Indicator = (function() {
   var originalTitle = document.title;
   var value = 0;
   var maximum = 1;
@@ -61,7 +58,7 @@ var Indicator = function() {
       getDialog().close();
     }
   };
-}();
+})();
 
 var Zipper = (function() {
   var javascript = (function() {
@@ -118,6 +115,16 @@ var concurrency = (function() {
   var query = $("<a>", { href: $("script").last().attr("src") })[0].search;
   return query ? query.substr(1) : 6;
 })();
+
+var getFileSaver = function() {
+  if (typeof saveAs == "undefined") {
+    return $.getScript(
+      "https://asannou.github.io/yakcd/jszip/vendor/FileSaver.js"
+    );
+  } else {
+    return $.Deferred().resolve();
+  }
+};
 
 var Yakcd = function(asin) {
 
@@ -205,9 +212,11 @@ return $.Deferred().resolve()
       }));
     });
   });
-  return d.pipe(function() {
-    return Zipper.generate({ type: "blob" });
-  });
+  return d;
+})
+.pipe(getFileSaver)
+.pipe(function() {
+  return Zipper.generate({ type: "blob" });
 })
 .done(function(content) {
   saveAs(content, asin + ".zip");
@@ -260,6 +269,7 @@ return $.Deferred().resolve()
   });
   return d;
 })
+.pipe(getFileSaver)
 .pipe(function() {
   return Zipper.generate({ type: "blob" });
 })
@@ -268,6 +278,16 @@ return $.Deferred().resolve()
   Indicator.clear();
 });
 
+};
+
+var appendCssTo = function(head) {
+  $("<link/>")
+  .attr({
+    rel: "stylesheet",
+    type: "text/css",
+    href: "https://asannou.github.io/yakcd/yakcd.css"
+  })
+  .appendTo(head);
 };
 
 var appendButtonTo = function(container) {
@@ -297,42 +317,39 @@ var appendButtonTo = function(container) {
   }
 };
 
-var appendCssTo = function(head) {
-  $("<link/>")
-  .attr({
-    rel: "stylesheet",
-    type: "text/css",
-    href: "https://asannou.github.io/yakcd/yakcd.css"
-  })
-  .appendTo(head);
-};
-
-if (!$("#KindleLibraryIFrame").length) {
-
 $.Deferred().resolve()
 .pipe(function() {
   var d = $.Deferred();
-  new MutationObserver(function(mutations) {
-    this.disconnect();
-    var iframeWindow = mutations[0].addedNodes[0];
-    d.resolve($(iframeWindow));
-  })
-  .observe(
-    $("#KindleLibraryContainer")[0],
-    { childList: true }
-  );
+  var iframe = $("#KindleLibraryIFrame");
+  if (iframe.length) {
+    d.resolve(iframe);
+  } else {
+    new MutationObserver(function(mutations) {
+      this.disconnect();
+      var iframeWindow = mutations[0].addedNodes[0];
+      d.resolve($(iframeWindow));
+    })
+    .observe(
+      $("#KindleLibraryContainer")[0],
+      { childList: true }
+    );
+  }
   return d;
 })
 .pipe(function(iframe) {
   var d = $.Deferred();
-  iframe.on("load", function() {
-    var iframeDocument = $(iframe.contents());
+  var iframeDocument = iframe.contents();
+  if (iframeDocument.find("#titles_inner_wrapper").length) {
     d.resolve(iframeDocument);
-  });
+  } else {
+    iframe.on("load", function() {
+      d.resolve(iframe.contents());
+    });
+  }
   return d;
 })
-.done(function(iframe) {
-  appendCssTo(iframe.find("head"));
+.done(function(iframeDocument) {
+  appendCssTo(iframeDocument.find("head"));
   new MutationObserver(function(mutations) {
     mutations.forEach(function(mutation) {
       $.makeArray(mutation.addedNodes).forEach(function(div) {
@@ -341,24 +358,15 @@ $.Deferred().resolve()
     });
   })
   .observe(
-    iframe.find("#titles_inner_wrapper")[0],
+    iframeDocument.find("#titles_inner_wrapper")[0],
     { childList: true }
   );
+  iframeDocument
+  .find(".book_container")
+  .each(function() {
+    appendButtonTo($(this));
+  });
 });
 
-} else {
-
-var iframeDocument = $("#KindleLibraryIFrame").contents();
-
-appendCssTo(iframeDocument.find("head"));
-
-iframeDocument
-.find(".book_container")
-.each(function() {
-  appendButtonTo($(this));
-});
-
-}
-
-});
+})();
 
