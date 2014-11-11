@@ -20,7 +20,7 @@
     }, false);
     document.body.appendChild(script);
   } else {
-    callback($);
+    callback(jQuery);
   }
 })(function($) {
 
@@ -125,8 +125,9 @@ var Retriable = function(dd) {
 };
 
 var concurrency = (function() {
-  var query = $("<a>", { href: $("script").last().attr("src") })[0].search;
-  return query ? query.substr(1) : 6;
+  var src = $("head script").last().attr("src");
+  var search = $("<a>", { href: src })[0].search;
+  return search ? search.substr(1) : 6;
 })();
 
 var getFileSaver = function() {
@@ -155,6 +156,11 @@ return $.Deferred().resolve()
   });
 })
 .pipe(function(book) {
+  var d = $.Deferred();
+  if (!book.manifestUrl) {
+    alert("manifestUrl is " + book.manifestUrl);
+    return d.reject();
+  }
   return Retriable(function() {
     return $.ajax({
       url: book.manifestUrl,
@@ -166,7 +172,7 @@ return $.Deferred().resolve()
     });
   })
   .pipe(function(manifest) {
-    return $.Deferred().resolve(book, manifest);
+    return d.resolve(book, manifest);
   });
 })
 .pipe(function(book, manifest) {
@@ -312,7 +318,7 @@ var appendButtonTo = function(container) {
   .css({
     position: "absolute",
     left: "70%",
-    top: "-6px"
+    top: "-2%"
   });
   if (
     container.hasClass("book_is_cached") ||
@@ -333,6 +339,11 @@ var appendButtonTo = function(container) {
 $.Deferred().resolve()
 .pipe(function() {
   var d = $.Deferred();
+  var div = $("#KindleLibraryContainer");
+  if (!div.length) {
+    alert(div.selector + " not found");
+    return d.reject();
+  }
   var iframe = $("#KindleLibraryIFrame");
   if (iframe.length) {
     d.resolve(iframe);
@@ -343,7 +354,7 @@ $.Deferred().resolve()
       d.resolve($(iframeWindow));
     })
     .observe(
-      $("#KindleLibraryContainer")[0],
+      div[0],
       { childList: true }
     );
   }
